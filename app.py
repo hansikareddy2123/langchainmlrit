@@ -1,4 +1,5 @@
 import os
+import re
 
 from fastapi import FastAPI
 from langserve import add_routes
@@ -45,17 +46,28 @@ When generating gate-level Verilog:
 - Provide complete Verilog code when requested.
 - Clearly explain the important gates and connections.
 
+Output formatting rules:
+- Use clean plain text formatting.
+- Do not use Markdown headings with # symbols.
+- Do not use ** for bold text.
+- Do not use triple backticks around Verilog code.
+- Do not put the answer inside quotation marks.
+- Present Verilog code as plain text with normal indentation.
+- Use simple numbered lists when explaining steps.
+- Keep the answer clear and readable.
+- Separate explanations and Verilog code with blank lines.
+
 Answer the user's actual question directly and clearly.
 """
 )
 
 
-# Input format for the API
+# Input format
 class VerilogQuestion(BaseModel):
     question: str
 
 
-# Convert the agent's large state into only the final answer
+# Run the agent and return only the final answer
 def run_agent(data):
     result = gate_level_agent.invoke({
         "messages": [
@@ -65,7 +77,7 @@ def run_agent(data):
 
     final_message = result["messages"][-1].content
 
-    # Gemini may return content as a list of blocks
+    # Gemini may return content as a list of text blocks
     if isinstance(final_message, list):
         final_message = "\n".join(
             block.get("text", str(block))
@@ -74,9 +86,39 @@ def run_agent(data):
             for block in final_message
         )
 
-    return final_message
+    # Remove Markdown formatting
+    final_message = re.sub(
+        r"```(?:verilog|systemverilog|v)?",
+        "",
+        final_message,
+        flags=re.IGNORECASE
+    )
+
+    final_message = final_message.replace("```", "")
+
+    # Remove Markdown heading symbols
+    final_message = re.sub(
+        r"^\s*#{1,6}\s*",
+        "",
+        final_message,
+        flags=re.MULTILINE
+    )
+
+    # Remove Markdown bold/italic markers
+    final_message = final_message.replace("**", "")
+    final_message = final_message.replace("__", "")
+
+    # Remove inline code backticks
+    final_message = re.sub(
+        r"`([^`]*)`",
+        r"\1",
+        final_message
+    )
+
+    return final_message.strip()
 
 
+# Clean agent runnable
 clean_agent = RunnableLambda(run_agent)
 
 
