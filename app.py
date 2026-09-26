@@ -67,11 +67,113 @@ class VerilogQuestion(BaseModel):
     question: str
 
 
+# Gate-Level scope checker
+def is_gate_level_question(question):
+    q = question.lower()
+
+    # Reject Dataflow modeling
+    dataflow_terms = [
+        "dataflow",
+        "data flow",
+        "assign statement",
+        "using assign",
+        "dataflow modeling"
+    ]
+
+    # Reject Behavioral modeling
+    behavioral_terms = [
+        "behavioral",
+        "behavioural",
+        "using always",
+        "always block",
+        "always @",
+        "always_ff",
+        "always_comb"
+    ]
+
+    # Reject unrelated programming languages/topics
+    unrelated_terms = [
+        "java",
+        "python",
+        "c++",
+        "javascript",
+        "html",
+        "css"
+    ]
+
+    if any(term in q for term in dataflow_terms):
+        return False
+
+    if any(term in q for term in behavioral_terms):
+        return False
+
+    if any(term in q for term in unrelated_terms):
+        return False
+
+    # Gate-level related terms
+    gate_level_terms = [
+        "gate-level",
+        "gate level",
+        "gate primitive",
+        "and gate",
+        "or gate",
+        "not gate",
+        "nand gate",
+        "nor gate",
+        "xor gate",
+        "xnor gate",
+        "structural verilog",
+        "structural modeling",
+        "structural model"
+    ]
+
+    # If explicitly Gate-Level, allow it
+    if any(term in q for term in gate_level_terms):
+        return True
+
+    # Common circuit-design requests can be Gate-Level requests
+    circuit_terms = [
+        "adder",
+        "subtractor",
+        "multiplexer",
+        "mux",
+        "demultiplexer",
+        "demux",
+        "encoder",
+        "decoder",
+        "comparator",
+        "flip-flop",
+        "flip flop",
+        "latch",
+        "register",
+        "counter",
+        "parity",
+        "truth table",
+        "circuit diagram"
+    ]
+
+    if any(term in q for term in circuit_terms):
+        return True
+
+    return False
+
+
 # Run the agent and return only the final answer
 def run_agent(data):
+
+    question = data["question"]
+
+    # Check whether the request belongs to Gate-Level modeling
+    if not is_gate_level_question(question):
+        return (
+            "This agent supports Gate-Level Verilog modeling only. "
+            "Dataflow, Behavioral and unrelated topics are outside "
+            "the scope of this agent."
+        )
+
     result = gate_level_agent.invoke({
         "messages": [
-            HumanMessage(content=data["question"])
+            HumanMessage(content=question)
         ]
     })
 
